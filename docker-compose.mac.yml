@@ -1,16 +1,15 @@
-version: "3.8"
-
 services:
   runner:
-    image: custom-github-runner-mac:latest
+    image: local/self-hosted-runner-mac:local
+    build:
+      context: .
+      dockerfile: Dockerfile.mac
     platform: linux/arm64
     restart: always
     environment:
-      - REPO=<owner>/<repo>
-      - REG_TOKEN=<reg-token-for-self-hosted-runner>
-      - NAME=<runner-name>
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      REPO: ${REPO:?REPO is required}
+      REG_TOKEN: ${REG_TOKEN:?REG_TOKEN is required}
+      NAME: ${NAME:?NAME is required}
     deploy:
       mode: replicated
       replicas: 1

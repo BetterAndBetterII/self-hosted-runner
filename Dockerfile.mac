@@ -1,12 +1,15 @@
-FROM --platform=linux/arm64 ubuntu:latest
+FROM --platform=linux/arm64 ubuntu:24.04@sha256:288ce2836bbcbed87626f077b10acb99006be8c3df12e21dda4f21ccbc58cc0b
 
-ARG RUNNER_VERSION="2.317.0"
+ARG RUNNER_VERSION="2.331.0"
+ARG RUNNER_ARCH="arm64"
+ARG RUNNER_SHA256="f5863a211241436186723159a111f352f25d5d22711639761ea24c98caef1a9a"
 
 # Add a user for the runner
 RUN useradd -m -s /bin/bash runner
 
 # Install necessary packages including .NET Core dependencies
 RUN apt-get update && apt-get install -y \
+    ca-certificates \
     curl \
     jq \
     python3 \
@@ -25,8 +28,9 @@ WORKDIR /home/runner
 
 # Set up the actions runner for ARM64
 RUN mkdir -p /home/runner/actions-runner && cd /home/runner/actions-runner \
-    && curl -o actions-runner-linux-arm64-${RUNNER_VERSION}.tar.gz -L https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-arm64-${RUNNER_VERSION}.tar.gz \
-    && tar xzf actions-runner-linux-arm64-${RUNNER_VERSION}.tar.gz
+    && curl -fsSLo actions-runner-linux-${RUNNER_ARCH}-${RUNNER_VERSION}.tar.gz -L "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-${RUNNER_ARCH}-${RUNNER_VERSION}.tar.gz" \
+    && echo "${RUNNER_SHA256}  actions-runner-linux-${RUNNER_ARCH}-${RUNNER_VERSION}.tar.gz" | sha256sum -c - \
+    && tar xzf actions-runner-linux-${RUNNER_ARCH}-${RUNNER_VERSION}.tar.gz
 
 # Install dependencies
 RUN cd /home/runner/actions-runner \

@@ -1,16 +1,17 @@
-version: '3.8'
-
 services:
   runner:
-    image: youssefbrr/github-actions:latest # You can use this image or build your own
+    image: local/self-hosted-runner:local
+    build:
+      context: ./Docker Image
+      dockerfile: Dockerfile
     restart: always
     environment:
-      - REPO=<owner>/<repo>
-      - REG_TOKEN=<reg-token-for-self-hosted-runner>
-      - NAME=<runner-name>
+      REPO: ${REPO:?REPO is required}
+      REG_TOKEN: ${REG_TOKEN:?REG_TOKEN is required}
+      NAME: ${NAME:?NAME is required}
     deploy:
       mode: replicated
-      replicas: 2
+      replicas: 1
       resources:
         limits:
           cpus: '0.5'

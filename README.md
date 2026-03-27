@@ -1,175 +1,279 @@
-# Self-Hosted Runner Dockerization
+# Self-Hosted Runner
 
-Welcome to the GitHub Self-Hosted Runner Dockerization repository. This project provides a Dockerized solution for setting up a self-hosted GitHub Actions runner.
+这个仓库用于本地构建并运行 GitHub Actions self-hosted runner。
 
-## Features
+当前默认行为：
 
-- **Docker Compose Setup**: Easily deploy self-hosted runners using Docker Compose.
-- **Customizable**: Use the provided Docker image or build your own using the Dockerfile.
-- **Scalable**: Deploy multiple runner replicas with resource constraints.
-- **Cross-Platform**: Support for Linux, macOS, and Windows environments.
+- 不再拉取远端可变的 `latest` 镜像。
+- 通过本仓库的 Dockerfile 本地构建镜像。
+- 基础镜像使用固定 digest。
+- GitHub Actions runner 压缩包使用固定版本和 SHA-256 校验。
+- Linux runner 镜像内已包含常用 CI 工具：`git`、`bash`、`sh`、`tar`、`unzip`、`make`、`node`、`npm`、`go`。
 
-## Repository Contents
+## 仓库内容
 
-- `LICENSE`: The license file for this project.
-- `README.md`: The documentation file you are currently reading.
-- `docker-compose.yml`: The Docker Compose file to deploy the self-hosted runner on Linux.
-- `docker-compose.mac.yml`: The Docker Compose file to deploy the self-hosted runner on macOS.
-- `docker-compose.windows.yml`: The Docker Compose file to deploy the self-hosted runner on Windows.
-- `Docker Image/`: A directory containing the Dockerfiles and start scripts for building the runner images.
+- `docker-compose.yml`: Linux x64 runner 的启动配置
+- `docker-compose.mac.yml`: macOS 上构建 Linux ARM64 runner 的启动配置
+- `.env.example`: 环境变量示例
+- `Docker Image/Dockerfile`: Linux x64 runner 镜像
+- `Docker Image/start.sh`: Linux x64 runner 启动脚本
+- `Dockerfile.mac`: Linux ARM64 runner 镜像
+- `start-mac.sh`: Linux ARM64 runner 启动脚本
 
-## Getting Started
-
-### Prerequisites
+## 前置要求
 
 - Docker
-- Docker Compose
+- Docker Compose v2
+- 具备目标仓库或组织的 runner 管理权限
 
-### Using Docker Compose on Linux
+## 启动方式
 
-1. Clone the repository:
+### Linux
 
-   ```sh
-   git clone https://github.com/youssefbrr/self-hosted-runner.git
-   cd self-hosted-runner
-   ```
+1. 克隆仓库
 
-2. Edit the `docker-compose.yml` file to specify your repository, registration token, and runner name.
+```sh
+git clone https://github.com/BetterAndBetterII/self-hosted-runner.git
+cd self-hosted-runner
+```
 
-3. Deploy the self-hosted runner:
-   ```sh
-   docker-compose up -d
-   ```
+2. 如果你希望从固定源码版本构建，请切到你信任的 commit
 
-### Using Docker Compose on macOS
+```sh
+git checkout <trusted-commit-sha>
+```
 
-1. Clone the repository:
+3. 准备环境变量文件
 
-   ```sh
-   git clone https://github.com/youssefbrr/self-hosted-runner.git
-   cd self-hosted-runner
-   ```
+```sh
+cp .env.example .env
+```
 
-2. Edit the `docker-compose.mac.yml` file to specify your repository, registration token, and runner name.
+4. 编辑 `.env`
 
-3. Deploy the self-hosted runner:
-   ```sh
-   docker-compose -f docker-compose.mac.yml up -d
-   ```
+```dotenv
+REPO=OWNER/REPO
+REG_TOKEN=replace-with-a-fresh-registration-token
+NAME=my-runner
+```
 
-### Using Docker Compose on Windows
+5. 构建并启动
 
-1. Prerequisites:
+```sh
+docker compose up -d --build
+```
 
-   - Install Docker Desktop for Windows
-   - Enable WSL 2 (Windows Subsystem for Linux)
-   - Install Ubuntu 20.04 from the Microsoft Store or enable it through PowerShell
+6. 查看日志
 
-2. Clone the repository:
+```sh
+docker compose logs -f
+```
 
-   ```sh
-   git clone https://github.com/youssefbrr/self-hosted-runner.git
-   cd self-hosted-runner
-   ```
+7. 停止并移除容器
 
-3. Edit the `docker-compose.windows.yml` file to specify your repository, registration token, and runner name.
+```sh
+docker compose down
+```
 
-4. Deploy the self-hosted runner:
-   ```sh
-   docker-compose -f docker-compose.windows.yml up -d
-   ```
+### Linux 同时运行多个 runner
 
-### Building Your Own Docker Image on Linux
+如果你要同时跑两个或更多 runner，不要共用项目根目录下的同一个 `.env`。最简单的做法是：
 
-1. Clone the repository:
+- 为每个 runner 准备单独的 env 文件
+- 为每次 `docker compose` 指定不同的 project name
+- 为每个 runner 使用不同的 `NAME`
 
-   ```sh
-   git clone https://github.com/youssefbrr/self-hosted-runner.git
-   cd self-hosted-runner
-   ```
+示例：
 
-2. Build the Docker image:
+`runner.repo-a.env`
 
-   ```sh
-   cd Docker Image
-   docker build -t custom-github-runner:latest ./
-   ```
+```dotenv
+REPO=OWNER_A/REPO_A
+REG_TOKEN=replace-with-a-fresh-registration-token-a
+NAME=runner-repo-a
+```
 
-3. Edit the `docker-compose.yml` file to use your custom image.
+`runner.repo-b.env`
 
-4. Deploy the self-hosted runner:
-   ```sh
-   docker-compose up -d
-   ```
+```dotenv
+REPO=OWNER_B/REPO_B
+REG_TOKEN=replace-with-a-fresh-registration-token-b
+NAME=runner-repo-b
+```
 
-### Building Your Own Docker Image on macOS
+先构建镜像：
 
-1. Clone the repository:
+```sh
+docker compose build
+```
 
-   ```sh
-   git clone https://github.com/youssefbrr/self-hosted-runner.git
-   cd self-hosted-runner
-   ```
+分别启动两个 runner：
 
-2. Build the Docker image:
+```sh
+docker compose -p runner-a --env-file runner.repo-a.env up -d
+docker compose -p runner-b --env-file runner.repo-b.env up -d
+```
 
-   ```sh
-   cd Docker Image
-   docker build -t custom-github-runner-mac:latest -f Dockerfile.mac ./
-   ```
+查看各自日志：
 
-3. Edit the `docker-compose.mac.yml` file to use your custom image.
+```sh
+docker compose -p runner-a logs -f
+docker compose -p runner-b logs -f
+```
 
-4. Deploy the self-hosted runner:
-   ```sh
-   docker-compose -f docker-compose.mac.yml up -d
-   ```
+分别停止：
 
-### Building Your Own Docker Image on Windows
+```sh
+docker compose -p runner-a down
+docker compose -p runner-b down
+```
 
-1. Clone the repository:
+说明：
 
-   ```sh
-   git clone https://github.com/youssefbrr/self-hosted-runner.git
-   cd self-hosted-runner
-   ```
+- `-p` 会让 Compose 为每一组容器生成独立的容器名、网络名和状态，不会互相覆盖
+- `--env-file` 让每个 runner 读取各自的 `REPO`、`REG_TOKEN`、`NAME`
+- `REG_TOKEN` 可以不同；如果目标仓库或组织不同，本来就必须分别生成
+- `NAME` 必须全局唯一，不能两个容器都叫同一个 runner 名
+- 如果两个 runner 都注册到同一个仓库或组织，也建议用不同名字，例如 `runner-ci-1` 和 `runner-ci-2`
 
-2. Build the Docker image:
+### macOS
 
-   ```sh
-   cd Docker Image
-   docker build -t custom-github-runner-windows:latest -f Dockerfile.windows ./
-   ```
+macOS 这里运行的仍然是 Linux ARM64 runner 容器，不是原生 macOS runner。
 
-3. Edit the `docker-compose.windows.yml` file to use your custom image.
+```sh
+cp .env.example .env
+docker compose -f docker-compose.mac.yml up -d --build
+```
 
-4. Deploy the self-hosted runner:
-   ```sh
-   docker-compose -f docker-compose.windows.yml up -d
-   ```
+停止：
 
-## Configuration
+```sh
+docker compose -f docker-compose.mac.yml down
+```
 
-### Environment Variables
+## 环境变量
 
-- `REPO`: The GitHub repository to register the runner to (format: `<owner>/<repo>`). It can also be set to an organization instead of a repository (format: `<owner>`).
-- `REG_TOKEN`: The registration token for the self-hosted runner from the GitHub repository settings.
-- `NAME`: The name of the self-hosted runner.
+Compose 文件默认从项目根目录的 `.env` 读取以下变量：
 
-## Notes for macOS Users
+- `REPO`: 目标仓库或组织
+  - 仓库级 runner: `owner/repo`
+  - 组织级 runner: `owner`
+- `REG_TOKEN`: GitHub 下发的 runner registration token
+- `NAME`: runner 名称。必须唯一；如果远端已有同名 runner，启动脚本会使用 `--replace` 进行替换
 
-For macOS, keep in mind:
+可以先用下面命令检查配置是否齐全：
 
-1. You need to have Docker Desktop for Mac installed and running.
-2. The macOS runner uses different base images and paths compared to the Linux version.
-3. Performance may differ from the Linux version due to the virtualization layer.
+```sh
+docker compose config
+```
 
-## Notes for Windows Users
+## 如何获取 REG_TOKEN
 
-For Windows, keep in mind:
+`REG_TOKEN` 不是 PAT，也不是长期 token。它是 GitHub 为 self-hosted runner 注册生成的短期 token。根据 GitHub 官方文档，这个 token 只在 1 小时内有效。
 
-1. You need to have Docker Desktop for Windows installed and running.
-2. WSL 2 must be enabled and properly configured.
-3. The Ubuntu 20.04 distribution should be installed through WSL.
-4. Performance may vary depending on your system's virtualization settings.
-5. Make sure your Windows system meets the minimum requirements for running Docker Desktop and WSL 2.
+### 通过 GitHub Web UI 获取仓库级 token
+
+1. 打开目标仓库
+2. 进入 `Settings`
+3. 进入 `Actions`
+4. 进入 `Runners`
+5. 点击 `New self-hosted runner`
+6. 页面上会展示当前可用的 registration token
+
+### 通过 GitHub Web UI 获取组织级 token
+
+1. 打开目标组织
+2. 进入 `Settings`
+3. 进入 `Actions`
+4. 进入 `Runners`
+5. 点击 `New self-hosted runner`
+6. 页面上会展示当前可用的 registration token
+
+### 通过 GitHub CLI 获取仓库级 token
+
+需要对目标仓库有管理员权限。
+
+- fine-grained PAT 需要仓库 `Administration: write`
+- classic PAT 需要 `repo` scope
+
+```sh
+gh api \
+  --method POST \
+  repos/OWNER/REPO/actions/runners/registration-token \
+  --jq .token
+```
+
+### 通过 GitHub CLI 获取组织级 token
+
+需要对目标组织有管理员权限。
+
+- fine-grained PAT 需要组织 runner 相关管理权限
+- classic PAT 通常需要 `admin:org`
+
+```sh
+gh api \
+  --method POST \
+  orgs/ORG/actions/runners/registration-token \
+  --jq .token
+```
+
+拿到 token 后，立刻写入 `.env` 并执行 `docker compose up -d --build`。如果启动时出现 404 或注册失败，优先怀疑 token 已经过期，重新生成一个新的 token 即可。
+
+## 当前镜像内容
+
+Linux x64 runner 镜像当前内置以下常用工具：
+
+- `git`
+- `bash`
+- `sh`
+- `tar`
+- `unzip`
+- `zip`
+- `make`
+- `node`
+- `npm`
+- `go`
+- `python3`
+- `curl`
+- `jq`
+- `openssh-client`
+
+## 安全说明
+
+- Linux 镜像固定到 `ubuntu:24.04@sha256:67efaecc0031a612cf7bb3c863407018dbbef0a971f62032b77aa542ac8ac0d2`
+- macOS 侧 ARM64 镜像固定到 `ubuntu:24.04@sha256:288ce2836bbcbed87626f077b10acb99006be8c3df12e21dda4f21ccbc58cc0b`
+- GitHub Actions runner 固定为 `v2.331.0`
+- runner 压缩包下载后会在镜像构建时校验 SHA-256
+- `docker-compose.mac.yml` 默认不挂载 `/var/run/docker.sock`
+
+## 常见问题
+
+### runner 名称冲突
+
+如果远端已经有同名 runner，本仓库启动脚本会使用 `--replace`。这会让新的 runner 替换远端已有的同名 runner。
+
+### token 无效或过期
+
+如果日志里出现类似下面的错误，通常是 token 已过期：
+
+- `Response status code does not indicate success: 404 (Not Found)`
+
+重新生成新的 registration token 并重启即可：
+
+```sh
+docker compose down
+docker compose up -d --build
+```
+
+### 查看 runner 是否已上线
+
+```sh
+docker compose logs -f
+```
+
+正常情况下会看到：
+
+```text
+Runner successfully added
+Listening for Jobs
+```
